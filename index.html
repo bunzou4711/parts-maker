@@ -1,0 +1,965 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <title>ゴリ特製 かんたん部品メーカー</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+      :root{
+        --bg:#f2efe9;
+        --panel:#ffffff;
+        --panel-2:#e9e4da;
+        --ink:#23211d;
+        --ink-soft:#5c564c;
+        --line:#d8d2c6;
+        --accent:#bc4b26;
+        --accent-ink:#ffffff;
+        --accent-soft:#f6e3da;
+        --field:#fbf9f5;
+        --warn-bg:#fdf3d7;
+        --warn-ink:#7a5b12;
+        --stage-bg:#26241f;
+        --shadow:0 2px 10px rgba(35,33,29,.08);
+      }
+      @media (prefers-color-scheme: dark){
+        :root{
+          --bg:#16171a;
+          --panel:#22242a;
+          --panel-2:#2c2f36;
+          --ink:#f0ede6;
+          --ink-soft:#b6b0a4;
+          --line:#3a3d45;
+          --accent:#d96f45;
+          --accent-ink:#ffffff;
+          --accent-soft:#3d2a22;
+          --field:#1b1d21;
+          --warn-bg:#3a331d;
+          --warn-ink:#ecd28a;
+          --stage-bg:#101114;
+          --shadow:0 2px 10px rgba(0,0,0,.4);
+        }
+      }
+      *{ box-sizing:border-box; }
+      html{ -webkit-text-size-adjust:100%; }
+      body{
+        margin:0;
+        background:var(--bg);
+        color:var(--ink);
+        font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif;
+        font-weight:500;
+        line-height:1.55;
+      }
+      button, input{ font-family:inherit; }
+      button{ min-height:3rem; cursor:pointer; }
+      .wrap{
+        max-width:1060px;
+        margin:0 auto;
+        padding:14px 14px 40px;
+      }
+      .lead{
+        font-size:1.02rem;
+        color:var(--ink-soft);
+        margin:4px 2px 14px;
+      }
+      .lead strong{ color:var(--ink); }
+      .sec-title{
+        font-size:1.15rem;
+        font-weight:900;
+        margin:20px 2px 10px;
+        display:flex;
+        align-items:center;
+        gap:.5em;
+      }
+      .sec-title:first-child{ margin-top:2px; }
+      .sec-num{
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        width:1.7em; height:1.7em;
+        border-radius:50%;
+        background:var(--accent);
+        color:var(--accent-ink);
+        font-size:.95rem;
+        flex:none;
+      }
+
+      /* ---- part picker ---- */
+      .part-grid{
+        display:grid;
+        grid-template-columns:repeat(3,1fr);
+        gap:10px;
+      }
+      @media (max-width:560px){
+        .part-grid{ grid-template-columns:repeat(2,1fr); }
+      }
+      .part-btn{
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        gap:6px;
+        padding:14px 8px 12px;
+        background:var(--panel);
+        border:2px solid var(--line);
+        border-radius:14px;
+        color:var(--ink);
+        font-size:1.02rem;
+        font-weight:700;
+        box-shadow:var(--shadow);
+        min-height:6.2rem;
+      }
+      .part-btn svg{ width:52px; height:40px; }
+      .part-btn svg *{ vector-effect:non-scaling-stroke; }
+      .part-btn[aria-pressed="true"]{
+        border-color:var(--accent);
+        background:var(--accent-soft);
+      }
+      .part-btn .sub{
+        font-size:.78rem;
+        font-weight:500;
+        color:var(--ink-soft);
+      }
+
+      /* ---- layout: stage + controls ---- */
+      .work{
+        display:grid;
+        grid-template-columns:1fr;
+        gap:14px;
+        margin-top:6px;
+      }
+      @media (min-width:860px){
+        .work{ grid-template-columns:1.05fr .95fr; align-items:start; }
+      }
+      .card{
+        background:var(--panel);
+        border:1px solid var(--line);
+        border-radius:16px;
+        box-shadow:var(--shadow);
+        overflow:hidden;
+      }
+      .stage-box{ background:var(--stage-bg); position:relative; }
+      #stage{
+        display:block;
+        width:100%;
+        height:320px;
+        touch-action:none;
+      }
+      @media (min-width:860px){ #stage{ height:380px; } }
+      .stage-hint{
+        position:absolute;
+        left:10px; bottom:8px;
+        color:rgba(255,255,255,.75);
+        font-size:.8rem;
+        pointer-events:none;
+      }
+      .stage-fallback{
+        display:none;
+        padding:40px 20px;
+        color:#fff;
+        text-align:center;
+        font-size:.95rem;
+      }
+      .dims-bar{
+        padding:12px 16px;
+        border-top:1px solid var(--line);
+        display:flex;
+        flex-wrap:wrap;
+        gap:6px 14px;
+        align-items:baseline;
+      }
+      .dims-bar .dims{
+        font-size:1.12rem;
+        font-weight:900;
+      }
+      .dims-bar .fname{
+        font-size:.85rem;
+        color:var(--ink-soft);
+        word-break:break-all;
+      }
+
+      /* ---- params ---- */
+      .params{ padding:6px 16px 4px; }
+      .param{
+        display:grid;
+        grid-template-columns:1fr auto;
+        gap:4px 10px;
+        padding:12px 0;
+        border-bottom:1px dashed var(--line);
+        align-items:center;
+      }
+      .param:last-child{ border-bottom:none; }
+      .param label{
+        font-size:1.05rem;
+        font-weight:700;
+      }
+      .param .unit-note{
+        grid-column:1 / -1;
+        font-size:.82rem;
+        color:var(--ink-soft);
+      }
+      .stepper{
+        display:flex;
+        align-items:stretch;
+        gap:6px;
+      }
+      .step-btn{
+        width:3.4rem;
+        border-radius:12px;
+        border:2px solid var(--line);
+        background:var(--panel-2);
+        color:var(--ink);
+        font-size:1.5rem;
+        font-weight:900;
+        line-height:1;
+        touch-action:manipulation;
+        user-select:none;
+        -webkit-user-select:none;
+      }
+      .step-btn:active{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+      .num-input{
+        width:5.2rem;
+        text-align:center;
+        font-size:1.3rem;
+        font-weight:900;
+        color:var(--ink);
+        background:var(--field);
+        border:2px solid var(--line);
+        border-radius:12px;
+        min-height:3rem;
+        padding:2px 4px;
+        -moz-appearance:textfield;
+        appearance:textfield;
+      }
+      .num-input::-webkit-outer-spin-button,
+      .num-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+      .num-input:focus{ outline:3px solid var(--accent); outline-offset:1px; }
+      .toggle{
+        display:flex;
+        gap:6px;
+      }
+      .toggle button{
+        min-width:5.2rem;
+        padding:0 14px;
+        border-radius:12px;
+        border:2px solid var(--line);
+        background:var(--field);
+        color:var(--ink);
+        font-size:1.05rem;
+        font-weight:700;
+      }
+      .toggle button[aria-pressed="true"]{
+        background:var(--accent);
+        border-color:var(--accent);
+        color:var(--accent-ink);
+      }
+      .presets{
+        padding:10px 16px 14px;
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+        align-items:center;
+      }
+      .presets .p-label{ font-size:.88rem; font-weight:700; color:var(--ink-soft); width:100%; }
+      .preset-btn{
+        border:2px solid var(--line);
+        background:var(--field);
+        color:var(--ink);
+        border-radius:999px;
+        padding:0 16px;
+        font-size:.95rem;
+        font-weight:700;
+        min-height:2.75rem;
+      }
+      .preset-btn:active{ border-color:var(--accent); background:var(--accent-soft); }
+      .warn{
+        display:none;
+        margin:0 16px 14px;
+        padding:10px 12px;
+        border-radius:10px;
+        background:var(--warn-bg);
+        color:var(--warn-ink);
+        font-size:.92rem;
+        font-weight:700;
+      }
+
+      /* ---- download ---- */
+      .dl-btn{
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        gap:.6em;
+        width:100%;
+        min-height:4.4rem;
+        border:none;
+        border-radius:16px;
+        background:var(--accent);
+        color:var(--accent-ink);
+        font-size:1.45rem;
+        font-weight:900;
+        box-shadow:0 6px 18px rgba(188,75,38,.35);
+        margin-top:14px;
+      }
+      .dl-btn:active{ transform:translateY(1px); }
+      .dl-btn svg{ width:30px; height:30px; flex:none; }
+      .dl-done{
+        display:none;
+        margin-top:10px;
+        padding:10px 14px;
+        border-radius:10px;
+        background:var(--accent-soft);
+        font-weight:700;
+        font-size:.98rem;
+      }
+
+      /* ---- howto ---- */
+      .howto{
+        margin-top:22px;
+        background:var(--panel);
+        border:1px solid var(--line);
+        border-radius:16px;
+        padding:6px 18px 14px;
+        box-shadow:var(--shadow);
+      }
+      .howto ol{
+        margin:6px 0 4px;
+        padding-left:1.4em;
+        font-size:1rem;
+      }
+      .howto li{ margin:.45em 0; }
+      .howto p{ color:var(--ink-soft); font-size:.92rem; margin:.4em 0; }
+    </style>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="部品メーカー">
+</head>
+  <body>
+    <main class="wrap">
+      <p class="lead"><strong>部品をえらんで、数字を入れるだけ。</strong>あとはSTLボタンを押せば、3Dプリント用のデータができます。単位は全部 <strong>mm</strong> です。</p>
+
+      <h2 class="sec-title"><span class="sec-num">1</span>部品をえらぶ</h2>
+      <div class="part-grid" id="partGrid" role="group" aria-label="部品の種類"></div>
+
+      <div class="work">
+        <section class="card" aria-label="プレビュー">
+          <div class="stage-box">
+            <canvas id="stage"></canvas>
+            <div class="stage-fallback" id="stageFallback">3D表示が読み込めませんでした。<br />通信のよい場所で、ページを開き直してください。</div>
+            <div class="stage-hint" id="stageHint">指でドラッグすると回ります</div>
+          </div>
+          <div class="dims-bar">
+            <span class="dims" id="dimsText">—</span>
+            <span class="fname" id="fnameText"></span>
+          </div>
+        </section>
+
+        <section class="card" aria-label="寸法入力">
+          <h2 class="sec-title" style="margin:14px 16px 0;"><span class="sec-num">2</span>数字を入れる</h2>
+          <div class="params" id="params"></div>
+          <div class="presets" id="presets" style="display:none;"></div>
+          <div class="warn" id="warn" role="status"></div>
+        </section>
+      </div>
+
+      <button class="dl-btn" id="dlBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m6.5 10.5 5.5 5.5 5.5-5.5"/><path d="M4 20h16"/></svg>
+        STLをダウンロード
+      </button>
+      <div class="dl-done" id="dlDone"></div>
+
+      <section class="howto">
+        <h2 class="sec-title"><span class="sec-num">3</span>印刷までの流れ</h2>
+        <ol>
+          <li>上のボタンでSTLをダウンロードします。</li>
+          <li>STLをSDカードに入れて、プリンター（A1 mini）に差します。タブレットからMakerWorldに上げてBambu Handyで送ってもOKです。</li>
+          <li>プリンターの画面でファイルをえらんで印刷します。</li>
+        </ol>
+        <p>穴の大きさは、M3ネジが通る <strong>3.4mm</strong> が最初の設定になっています。ネジを直接ねじ込む穴にしたいときは 2.9mm くらいにしてください。</p>
+      </section>
+    </main>
+
+    <script>
+    'use strict';
+    /* ================= helpers ================= */
+    function fmt(n){
+      var v = Math.round(n * 100) / 100;
+      return (v % 1 === 0) ? String(v) : String(v);
+    }
+    function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
+
+    /* ================= part icons (inline SVG) ================= */
+    var ICONS = {
+      plate: '<svg viewBox="0 0 52 40" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="4" y="7" width="44" height="26" rx="2"/><circle cx="12" cy="14" r="2.6"/><circle cx="40" cy="14" r="2.6"/><circle cx="12" cy="26" r="2.6"/><circle cx="40" cy="26" r="2.6"/></svg>',
+      box: '<svg viewBox="0 0 52 40" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M8 14 26 6l18 8v18L26 38 8 32z"/><path d="M8 14l18 8 18-8"/><path d="M26 22v16"/><path d="M15 10.5 33 19"/></svg>',
+      cylinder: '<svg viewBox="0 0 52 40" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><ellipse cx="26" cy="10" rx="15" ry="5"/><path d="M11 10v20c0 2.8 6.7 5 15 5s15-2.2 15-5V10"/></svg>',
+      spacer: '<svg viewBox="0 0 52 40" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><ellipse cx="26" cy="10" rx="15" ry="5"/><ellipse cx="26" cy="10" rx="6.5" ry="2.4"/><path d="M11 10v20c0 2.8 6.7 5 15 5s15-2.2 15-5V10"/><path d="M19.5 11v17M32.5 11v17"/></svg>',
+      washer: '<svg viewBox="0 0 52 40" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="26" cy="20" r="15"/><circle cx="26" cy="20" r="6.5"/></svg>',
+      bracket: '<svg viewBox="0 0 52 40" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M10 4v24h32v10H4V4z" stroke-linejoin="round"/><circle cx="10" cy="16" r="0.1" fill="currentColor"/></svg>'
+    };
+
+    /* ================= geometry builders =================
+       Each build(p) returns an array of THREE geometry objects (Z-up after
+       transforms). They are merged into a flat triangle list below. */
+
+    function rectShape(w, d){
+      var s = new THREE.Shape();
+      s.moveTo(-w/2, -d/2);
+      s.lineTo( w/2, -d/2);
+      s.lineTo( w/2,  d/2);
+      s.lineTo(-w/2,  d/2);
+      s.closePath();
+      return s;
+    }
+    function rectPath(w, d){
+      var p = new THREE.Path();
+      p.moveTo(-w/2, -d/2);
+      p.lineTo(-w/2,  d/2);
+      p.lineTo( w/2,  d/2);
+      p.lineTo( w/2, -d/2);
+      p.closePath();
+      return p;
+    }
+    function circlePath(r){
+      var p = new THREE.Path();
+      p.absarc(0, 0, r, 0, Math.PI * 2, true);
+      return p;
+    }
+
+    function buildPlate(p, warn){
+      var shape = rectShape(p.w, p.d);
+      if (p.holes === 1){
+        var inset = p.inset;
+        var maxInset = Math.min(p.w, p.d) / 2 - p.holeD / 2 - 0.6;
+        if (inset > maxInset){
+          inset = Math.max(2, maxInset);
+          warn.push('穴の位置を内側にずらしました（端から ' + fmt(inset) + 'mm）。');
+        }
+        var xs = [-p.w/2 + inset, p.w/2 - inset];
+        var ys = [-p.d/2 + inset, p.d/2 - inset];
+        for (var i = 0; i < 2; i++){
+          for (var j = 0; j < 2; j++){
+            var h = new THREE.Path();
+            h.absarc(xs[i], ys[j], p.holeD / 2, 0, Math.PI * 2, true);
+            shape.holes.push(h);
+          }
+        }
+      }
+      var g = new THREE.ExtrudeGeometry(shape, { depth: p.t, bevelEnabled: false, curveSegments: 40 });
+      return [g];
+    }
+
+    function buildBox(p, warn){
+      var wall = p.wall;
+      var maxWall = (Math.min(p.w, p.d) / 2) - 1;
+      if (wall > maxWall){
+        wall = Math.max(0.8, maxWall);
+        warn.push('かべの厚さを ' + fmt(wall) + 'mm に調整しました。');
+      }
+      var bottom = Math.min(p.bottom, p.h - 1);
+      if (bottom < p.bottom) warn.push('底の厚さを ' + fmt(bottom) + 'mm に調整しました。');
+      var shape = rectShape(p.w, p.d);
+      shape.holes.push(rectPath(p.w - wall * 2, p.d - wall * 2));
+      var walls = new THREE.ExtrudeGeometry(shape, { depth: p.h - bottom, bevelEnabled: false });
+      walls.translate(0, 0, bottom);
+      var base = new THREE.BoxGeometry(p.w, p.d, bottom);
+      base.translate(0, 0, bottom / 2);
+      return [walls, base];
+    }
+
+    function buildCylinder(p){
+      var g = new THREE.CylinderGeometry(p.dia / 2, p.dia / 2, p.h, 56);
+      g.rotateX(Math.PI / 2);
+      g.translate(0, 0, p.h / 2);
+      return [g];
+    }
+
+    function buildTube(p, warn){
+      var id = p.id;
+      var maxId = p.od - 1.6;
+      if (id > maxId){
+        id = Math.max(0.5, maxId);
+        warn.push('内径を ' + fmt(id) + 'mm に調整しました（外径より小さくする必要があります）。');
+      }
+      var shape = new THREE.Shape();
+      shape.absarc(0, 0, p.od / 2, 0, Math.PI * 2, false);
+      shape.holes.push(circlePath(id / 2));
+      var g = new THREE.ExtrudeGeometry(shape, { depth: p.len, bevelEnabled: false, curveSegments: 48 });
+      return [g];
+    }
+
+    function buildBracket(p){
+      var s = new THREE.Shape();
+      s.moveTo(0, 0);
+      s.lineTo(p.legA, 0);
+      s.lineTo(p.legA, p.t);
+      s.lineTo(p.t, p.t);
+      s.lineTo(p.t, p.legB);
+      s.lineTo(0, p.legB);
+      s.closePath();
+      var g = new THREE.ExtrudeGeometry(s, { depth: p.width, bevelEnabled: false });
+      g.rotateX(Math.PI / 2); /* shape Y -> Z (up), extrusion -> Y (width) */
+      return [g];
+    }
+
+    /* ================= part definitions ================= */
+    var PARTS = [
+      {
+        id: 'plate', name: '板', sub: 'プレート', icon: ICONS.plate,
+        params: [
+          { k:'w', label:'よこ', def:60, min:10, max:220, step:1 },
+          { k:'d', label:'たて', def:40, min:10, max:220, step:1 },
+          { k:'t', label:'あつさ', def:3, min:1, max:20, step:0.5 },
+          { k:'holes', label:'四すみの穴', type:'toggle', def:1, on:'あり', off:'なし' },
+          { k:'inset', label:'穴の位置（端から）', def:6, min:3, max:60, step:0.5, showIf:function(p){ return p.holes === 1; } },
+          { k:'holeD', label:'穴の大きさ', def:3.4, min:2, max:12, step:0.2, note:'M3ネジが通る穴は 3.4mm', showIf:function(p){ return p.holes === 1; } }
+        ],
+        presets: [
+          { label:'40×40×3', values:{ w:40, d:40, t:3 } },
+          { label:'60×40×3', values:{ w:60, d:40, t:3 } },
+          { label:'100×50×4', values:{ w:100, d:50, t:4 } }
+        ],
+        build: buildPlate,
+        dims: function(p){ return 'よこ ' + fmt(p.w) + ' × たて ' + fmt(p.d) + ' × あつさ ' + fmt(p.t) + ' mm'; },
+        fname: function(p){ return 'plate_' + fmt(p.w) + 'x' + fmt(p.d) + 'x' + fmt(p.t) + '.stl'; }
+      },
+      {
+        id: 'box', name: '箱', sub: '中が空っぽ', icon: ICONS.box,
+        params: [
+          { k:'w', label:'よこ（外側）', def:60, min:15, max:220, step:1 },
+          { k:'d', label:'たて（外側）', def:40, min:15, max:220, step:1 },
+          { k:'h', label:'高さ（外側）', def:30, min:8, max:200, step:1 },
+          { k:'wall', label:'かべの厚さ', def:2, min:0.8, max:10, step:0.4 },
+          { k:'bottom', label:'底の厚さ', def:2, min:0.8, max:10, step:0.4 }
+        ],
+        build: buildBox,
+        dims: function(p){ return 'よこ ' + fmt(p.w) + ' × たて ' + fmt(p.d) + ' × 高さ ' + fmt(p.h) + ' mm（中空）'; },
+        fname: function(p){ return 'box_' + fmt(p.w) + 'x' + fmt(p.d) + 'x' + fmt(p.h) + '.stl'; }
+      },
+      {
+        id: 'cylinder', name: '丸ぼう', sub: '円柱', icon: ICONS.cylinder,
+        params: [
+          { k:'dia', label:'太さ（直径）', def:20, min:3, max:150, step:1 },
+          { k:'h', label:'長さ（高さ）', def:30, min:2, max:220, step:1 }
+        ],
+        build: function(p){ return buildCylinder(p); },
+        dims: function(p){ return '直径 ' + fmt(p.dia) + ' × 長さ ' + fmt(p.h) + ' mm'; },
+        fname: function(p){ return 'cylinder_d' + fmt(p.dia) + 'x' + fmt(p.h) + '.stl'; }
+      },
+      {
+        id: 'spacer', name: 'スペーサー', sub: '筒・カラー', icon: ICONS.spacer,
+        params: [
+          { k:'od', label:'外の太さ（外径）', def:8, min:4, max:100, step:0.5 },
+          { k:'id', label:'穴の太さ（内径）', def:3.4, min:1, max:90, step:0.2, note:'M3ボルト用は 3.4mm' },
+          { k:'len', label:'長さ', def:10, min:1, max:220, step:1 }
+        ],
+        presets: [
+          { label:'M3用 長さ10', values:{ od:8, id:3.4, len:10 } },
+          { label:'M3用 長さ20', values:{ od:8, id:3.4, len:20 } },
+          { label:'M4用 長さ10', values:{ od:9, id:4.5, len:10 } }
+        ],
+        build: buildTube,
+        dims: function(p){ return '外径 ' + fmt(p.od) + ' × 内径 ' + fmt(p.id) + ' × 長さ ' + fmt(p.len) + ' mm'; },
+        fname: function(p){ return 'spacer_' + fmt(p.od) + 'x' + fmt(p.id) + 'x' + fmt(p.len) + '.stl'; }
+      },
+      {
+        id: 'washer', name: 'ワッシャー', sub: '平たい輪', icon: ICONS.washer,
+        params: [
+          { k:'od', label:'外の太さ（外径）', def:7, min:4, max:100, step:0.5 },
+          { k:'id', label:'穴の太さ（内径）', def:3.4, min:1, max:90, step:0.2, note:'M3用は 3.4mm' },
+          { k:'len', label:'あつさ', def:1, min:0.6, max:10, step:0.2 }
+        ],
+        presets: [
+          { label:'M3用', values:{ od:7, id:3.4, len:1 } },
+          { label:'M3用 大きめ', values:{ od:10, id:3.4, len:1.2 } },
+          { label:'M4用', values:{ od:9, id:4.5, len:1 } }
+        ],
+        build: function(p, warn){ return buildTube(p, warn); },
+        dims: function(p){ return '外径 ' + fmt(p.od) + ' × 内径 ' + fmt(p.id) + ' × あつさ ' + fmt(p.len) + ' mm'; },
+        fname: function(p){ return 'washer_' + fmt(p.od) + 'x' + fmt(p.id) + 'x' + fmt(p.len) + '.stl'; }
+      },
+      {
+        id: 'bracket', name: 'L字金具', sub: 'ブラケット', icon: ICONS.bracket,
+        params: [
+          { k:'width', label:'幅', def:30, min:8, max:150, step:1 },
+          { k:'legA', label:'下の一辺の長さ', def:40, min:12, max:200, step:1 },
+          { k:'legB', label:'立ち上がりの高さ', def:40, min:12, max:200, step:1 },
+          { k:'t', label:'あつさ', def:3, min:1.2, max:12, step:0.4, note:'穴は印刷のあとドリルで開けてください' }
+        ],
+        build: buildBracket,
+        dims: function(p){ return '幅 ' + fmt(p.width) + ' × 一辺 ' + fmt(p.legA) + ' × 高さ ' + fmt(p.legB) + ' × あつさ ' + fmt(p.t) + ' mm'; },
+        fname: function(p){ return 'bracket_' + fmt(p.width) + 'x' + fmt(p.legA) + 'x' + fmt(p.legB) + 'x' + fmt(p.t) + '.stl'; }
+      }
+    ];
+
+    /* ================= state ================= */
+    var state = { partId: 'plate', values: {} };
+    PARTS.forEach(function(part){
+      var v = {};
+      part.params.forEach(function(pr){ v[pr.k] = pr.def; });
+      state.values[part.id] = v;
+    });
+    function currentPart(){ return PARTS.filter(function(x){ return x.id === state.partId; })[0]; }
+    function currentValues(){ return state.values[state.partId]; }
+
+    var currentTris = [];   /* flat triangles: [x1,y1,z1, x2,y2,z2, x3,y3,z3] */
+    var currentSize = { x:0, y:0, z:0 };
+
+    /* ================= geometry -> triangles ================= */
+    function mergeTriangles(geoms){
+      var tris = [];
+      geoms.forEach(function(g){
+        var gg = g.index ? g.toNonIndexed() : g;
+        var pos = gg.attributes.position;
+        for (var i = 0; i + 2 < pos.count; i += 3){
+          tris.push([
+            pos.getX(i), pos.getY(i), pos.getZ(i),
+            pos.getX(i+1), pos.getY(i+1), pos.getZ(i+1),
+            pos.getX(i+2), pos.getY(i+2), pos.getZ(i+2)
+          ]);
+        }
+        if (gg !== g) gg.dispose();
+        g.dispose();
+      });
+      /* ground it: centre X/Y on 0, bottom on Z=0 */
+      var minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9,minZ=1e9,maxZ=-1e9;
+      tris.forEach(function(t){
+        for (var i = 0; i < 9; i += 3){
+          if (t[i]   < minX) minX = t[i];     if (t[i]   > maxX) maxX = t[i];
+          if (t[i+1] < minY) minY = t[i+1];   if (t[i+1] > maxY) maxY = t[i+1];
+          if (t[i+2] < minZ) minZ = t[i+2];   if (t[i+2] > maxZ) maxZ = t[i+2];
+        }
+      });
+      var ox = -(minX + maxX) / 2, oy = -(minY + maxY) / 2, oz = -minZ;
+      tris.forEach(function(t){
+        for (var i = 0; i < 9; i += 3){ t[i] += ox; t[i+1] += oy; t[i+2] += oz; }
+      });
+      currentSize = { x: maxX - minX, y: maxY - minY, z: maxZ - minZ };
+      return tris;
+    }
+
+    function rebuild(){
+      var part = currentPart();
+      var p = Object.assign({}, currentValues());
+      /* UI text (寸法表示はライブラリ無しでも出す) */
+      document.getElementById('dimsText').textContent = part.dims(p);
+      document.getElementById('fnameText').textContent = 'ファイル名： ' + part.fname(p);
+      var warnEl = document.getElementById('warn');
+      if (typeof THREE === 'undefined'){
+        warnEl.textContent = '部品データの読み込みに失敗しました。通信のよい場所で、ページを開き直してください。';
+        warnEl.style.display = 'block';
+        return;
+      }
+      var warn = [];
+      var geoms = part.build(p, warn);
+      currentTris = mergeTriangles(geoms);
+      if (warn.length){
+        warnEl.textContent = warn.join(' ');
+        warnEl.style.display = 'block';
+      } else {
+        warnEl.style.display = 'none';
+      }
+      updatePreview();
+    }
+
+    /* ================= STL (binary) export ================= */
+    function triNormal(t){
+      var ux = t[3]-t[0], uy = t[4]-t[1], uz = t[5]-t[2];
+      var vx = t[6]-t[0], vy = t[7]-t[1], vz = t[8]-t[2];
+      var nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx;
+      var len = Math.sqrt(nx*nx + ny*ny + nz*nz);
+      if (len === 0) return [0,0,0];
+      return [nx/len, ny/len, nz/len];
+    }
+    function makeSTLBlob(tris){
+      var buf = new ArrayBuffer(84 + tris.length * 50);
+      var dv = new DataView(buf);
+      dv.setUint32(80, tris.length, true);
+      var off = 84;
+      tris.forEach(function(t){
+        var n = triNormal(t);
+        dv.setFloat32(off, n[0], true); dv.setFloat32(off+4, n[1], true); dv.setFloat32(off+8, n[2], true);
+        off += 12;
+        for (var i = 0; i < 9; i++){ dv.setFloat32(off, t[i], true); off += 4; }
+        dv.setUint16(off, 0, true); off += 2;
+      });
+      return new Blob([buf], { type: 'model/stl' });
+    }
+    document.getElementById('dlBtn').addEventListener('click', function(){
+      if (!currentTris.length) rebuild();
+      var done = document.getElementById('dlDone');
+      if (!currentTris.length){
+        done.textContent = '部品データがまだ読み込めていません。通信のよい場所で、ページを開き直してください。';
+        done.style.display = 'block';
+        return;
+      }
+      var part = currentPart();
+      var fname = part.fname(currentValues());
+      var blob = makeSTLBlob(currentTris);
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = fname;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+      var done = document.getElementById('dlDone');
+      done.textContent = '「' + fname + '」をダウンロードしました。ファイルアプリの「ダウンロード」に入っています。';
+      done.style.display = 'block';
+    });
+
+    /* ================= UI: part picker ================= */
+    var grid = document.getElementById('partGrid');
+    PARTS.forEach(function(part){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'part-btn';
+      b.setAttribute('aria-pressed', part.id === state.partId ? 'true' : 'false');
+      b.dataset.partId = part.id;
+      b.innerHTML = part.icon + '<span>' + part.name + '</span><span class="sub">' + part.sub + '</span>';
+      b.addEventListener('click', function(){
+        state.partId = part.id;
+        grid.querySelectorAll('.part-btn').forEach(function(x){
+          x.setAttribute('aria-pressed', x.dataset.partId === state.partId ? 'true' : 'false');
+        });
+        renderParams();
+        rebuild();
+      });
+      grid.appendChild(b);
+    });
+
+    /* ================= UI: params ================= */
+    var paramsEl = document.getElementById('params');
+    var presetsEl = document.getElementById('presets');
+
+    function holdRepeat(btn, fn){
+      var t1 = null, t2 = null;
+      function start(e){
+        e.preventDefault();
+        fn();
+        t1 = setTimeout(function(){ t2 = setInterval(fn, 70); }, 380);
+      }
+      function stop(){
+        if (t1) clearTimeout(t1);
+        if (t2) clearInterval(t2);
+        t1 = t2 = null;
+      }
+      btn.addEventListener('pointerdown', start);
+      btn.addEventListener('pointerup', stop);
+      btn.addEventListener('pointerleave', stop);
+      btn.addEventListener('pointercancel', stop);
+    }
+
+    function renderParams(){
+      var part = currentPart();
+      var vals = currentValues();
+      paramsEl.innerHTML = '';
+      part.params.forEach(function(pr){
+        if (pr.showIf && !pr.showIf(vals)) return;
+        var row = document.createElement('div');
+        row.className = 'param';
+        var lab = document.createElement('label');
+        lab.textContent = pr.label + (pr.type === 'toggle' ? '' : '（mm）');
+        row.appendChild(lab);
+
+        if (pr.type === 'toggle'){
+          var tg = document.createElement('div');
+          tg.className = 'toggle';
+          [[1, pr.on], [0, pr.off]].forEach(function(opt){
+            var tb = document.createElement('button');
+            tb.type = 'button';
+            tb.textContent = opt[1];
+            tb.setAttribute('aria-pressed', vals[pr.k] === opt[0] ? 'true' : 'false');
+            tb.addEventListener('click', function(){
+              vals[pr.k] = opt[0];
+              renderParams();
+              rebuild();
+            });
+            tg.appendChild(tb);
+          });
+          row.appendChild(tg);
+        } else {
+          var st = document.createElement('div');
+          st.className = 'stepper';
+          var minus = document.createElement('button');
+          minus.type = 'button'; minus.className = 'step-btn'; minus.textContent = '−';
+          minus.setAttribute('aria-label', pr.label + 'を小さく');
+          var input = document.createElement('input');
+          input.className = 'num-input';
+          input.type = 'number';
+          input.inputMode = 'decimal';
+          input.min = pr.min; input.max = pr.max; input.step = pr.step;
+          input.value = fmt(vals[pr.k]);
+          input.setAttribute('aria-label', pr.label);
+          var plus = document.createElement('button');
+          plus.type = 'button'; plus.className = 'step-btn'; plus.textContent = '＋';
+          plus.setAttribute('aria-label', pr.label + 'を大きく');
+
+          function apply(v){
+            v = clamp(Math.round(v * 100) / 100, pr.min, pr.max);
+            vals[pr.k] = v;
+            input.value = fmt(v);
+            rebuild();
+          }
+          holdRepeat(minus, function(){ apply((parseFloat(input.value) || pr.def) - pr.step); });
+          holdRepeat(plus,  function(){ apply((parseFloat(input.value) || pr.def) + pr.step); });
+          input.addEventListener('change', function(){
+            var v = parseFloat(input.value);
+            if (isNaN(v)) v = pr.def;
+            apply(v);
+          });
+          st.appendChild(minus); st.appendChild(input); st.appendChild(plus);
+          row.appendChild(st);
+        }
+        if (pr.note){
+          var note = document.createElement('div');
+          note.className = 'unit-note';
+          note.textContent = pr.note;
+          row.appendChild(note);
+        }
+        paramsEl.appendChild(row);
+      });
+
+      /* presets */
+      presetsEl.innerHTML = '';
+      if (part.presets && part.presets.length){
+        presetsEl.style.display = 'flex';
+        var pl = document.createElement('span');
+        pl.className = 'p-label';
+        pl.textContent = 'よく使う寸法';
+        presetsEl.appendChild(pl);
+        part.presets.forEach(function(preset){
+          var pb = document.createElement('button');
+          pb.type = 'button';
+          pb.className = 'preset-btn';
+          pb.textContent = preset.label;
+          pb.addEventListener('click', function(){
+            Object.keys(preset.values).forEach(function(k){ vals[k] = preset.values[k]; });
+            renderParams();
+            rebuild();
+          });
+          presetsEl.appendChild(pb);
+        });
+      } else {
+        presetsEl.style.display = 'none';
+      }
+    }
+
+    /* ================= 3D preview (three.js) ================= */
+    var renderer = null, scene = null, camera = null, meshHolder = null, tiltGroup = null;
+    var camDist = 120, targetZ = 10;
+    var tiltX = 0.95, autoSpin = true, spinAngle = -0.6;
+
+    function initPreview(){
+      if (typeof THREE === 'undefined') {
+        document.getElementById('stageFallback').style.display = 'block';
+        document.getElementById('stage').style.display = 'none';
+        document.getElementById('stageHint').style.display = 'none';
+        return;
+      }
+      var canvas = document.getElementById('stage');
+      renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(42, 1, 0.5, 3000);
+      camera.up.set(0, 0, 1);
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+      var key = new THREE.DirectionalLight(0xffffff, 0.85);
+      key.position.set(60, -80, 120);
+      scene.add(key);
+      var fill = new THREE.DirectionalLight(0xffe2cf, 0.35);
+      fill.position.set(-70, 60, 40);
+      scene.add(fill);
+
+      var gridH = new THREE.GridHelper(400, 40, 0x8a8378, 0x4c463d);
+      gridH.rotation.x = Math.PI / 2;
+      gridH.position.z = -0.05;
+      gridH.material.transparent = true;
+      gridH.material.opacity = 0.5;
+      scene.add(gridH);
+
+      tiltGroup = new THREE.Group();
+      meshHolder = new THREE.Group();
+      tiltGroup.add(meshHolder);
+      scene.add(tiltGroup);
+
+      /* drag to rotate */
+      var dragging = false, lastX = 0, lastY = 0;
+      canvas.addEventListener('pointerdown', function(e){
+        dragging = true; lastX = e.clientX; lastY = e.clientY;
+        autoSpin = false;
+        canvas.setPointerCapture(e.pointerId);
+      });
+      canvas.addEventListener('pointermove', function(e){
+        if (!dragging) return;
+        spinAngle += (e.clientX - lastX) * 0.008;
+        tiltX = clamp(tiltX + (e.clientY - lastY) * 0.006, 0.15, 1.45);
+        lastX = e.clientX; lastY = e.clientY;
+      });
+      function endDrag(){ dragging = false; }
+      canvas.addEventListener('pointerup', endDrag);
+      canvas.addEventListener('pointercancel', endDrag);
+      canvas.addEventListener('wheel', function(e){
+        e.preventDefault();
+        camDist = clamp(camDist * (e.deltaY > 0 ? 1.12 : 0.9), 30, 900);
+      }, { passive: false });
+
+      function resize(){
+        var w = canvas.clientWidth, h = canvas.clientHeight;
+        if (!w || !h) return;
+        renderer.setSize(w, h, false);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      (function loop(){
+        requestAnimationFrame(loop);
+        if (autoSpin) spinAngle += 0.005;
+        tiltGroup.rotation.x = 0;
+        meshHolder.rotation.z = spinAngle;
+        /* tilt via camera height instead of rotating the part off its base */
+        var horiz = Math.cos(tiltX) * camDist;
+        var vert = Math.sin(tiltX) * camDist;
+        camera.position.set(0, -Math.max(horiz, camDist * 0.25), Math.max(vert, camDist * 0.18));
+        camera.lookAt(0, 0, targetZ);
+        renderer.render(scene, camera);
+      })();
+    }
+
+    function updatePreview(){
+      if (!renderer || !meshHolder) return;
+      while (meshHolder.children.length){
+        var c = meshHolder.children.pop();
+        if (c.geometry) c.geometry.dispose();
+        meshHolder.remove(c);
+      }
+      var posArr = new Float32Array(currentTris.length * 9);
+      currentTris.forEach(function(t, i){
+        for (var j = 0; j < 9; j++) posArr[i * 9 + j] = t[j];
+      });
+      var g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+      g.computeVertexNormals();
+      var mat = new THREE.MeshStandardMaterial({ color: 0xd9d2c7, metalness: 0.25, roughness: 0.55 });
+      var mesh = new THREE.Mesh(g, mat);
+      meshHolder.add(mesh);
+      var diag = Math.sqrt(currentSize.x*currentSize.x + currentSize.y*currentSize.y + currentSize.z*currentSize.z);
+      camDist = clamp(diag * 2.1, 45, 900);
+      targetZ = currentSize.z * 0.45;
+    }
+
+    /* ================= go ================= */
+    renderParams();
+    initPreview();
+    rebuild();
+    </script>
+  </body>
+</html>
